@@ -557,6 +557,12 @@ begin
 
   runStart := Now;
   fcube := faceletCube.Create(cubeSize);
+  // edgeParity/getEdgeCluster (used for an auxiliary parity coordinate as
+  // early as phase 2's "+cross" step, not just phase 5) index into
+  // fcube.ecls, which is only ever sized here in the original GUI -- do it
+  // up front so it's ready no matter which phase needs it first.
+  edgemx := fcube.size div 2;
+  SetLength(fcube.ecls, edgemx + 1, 24);
   if scrambleMode = 'moves' then
     ScrambleByMoves
   else
