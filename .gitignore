@@ -1,0 +1,22 @@
+# build artifacts
+/project1
+/lib/
+/backup/
+*.o
+*.ppu
+
+# generated pruning/move tables (cached to the working directory on first
+# run; multi-gigabyte and machine-specific, not source). Authoritative list
+# of every fName constant across phase1-4_tables.pas:
+/UDCentTrans
+/UDCenterMove
+/UDXCrossMove
+/UDXCrossPrun
+/UDCentBrick256Prun
+/UDCentersSlice10
+/FBCenterMove
+/FBFullCenterSlicePrun
+/Ph3RLFBCenterMove
+/Ph3RLFBXCrossMove
+/Ph3RLFBXCrossPrun
+/Ph3Brick702RLFBCentPrun

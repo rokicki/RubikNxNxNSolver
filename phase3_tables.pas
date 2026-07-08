@@ -45,14 +45,14 @@ var
 
 implementation
 
-uses facecube, main, Forms;
+uses facecube, globals;
 
 procedure createNextMovePhase3Table;
 var
   fc: faceletCube;
   mprev, mcurr: moves;
 begin
-  fc := faceletCube.Create(nil, 11); // any odd value possible
+  fc := faceletCube.Create(11); // any odd value possible
   for mcurr := InitMove to yB3 do
     // use NoMove for the predecessor if we have the first move
   begin
@@ -84,7 +84,7 @@ var
 const
   fName = 'Ph3RLFBCenterMove';
 begin
-  fc := faceletCube.Create(nil, 11); // 11 arbitrary
+  fc := faceletCube.Create(11); // 11 arbitrary
   SetLength(Ph3RLFBCenterMove, B_8_4 * B_8_4, 3 * 18);
 
   if FileExists(fName) then
@@ -164,7 +164,7 @@ var
 const
   fName = 'Ph3RLFBXCrossMove';
 begin
-  fc := faceletCube.Create(nil, 11); // 11 arbitrary
+  fc := faceletCube.Create(11); // 11 arbitrary
   SetLength(Ph3RLFBXCrossMove, B_8_4 * B_8_4, 2 * 18);
 
   if FileExists(fName) then
@@ -228,7 +228,7 @@ end;
 //  n: UInt32;
 //  fc: faceletcube;
 //begin
-//  fc := faceletCube.Create(nil, 11); // 11 arbitrary
+//  fc := faceletCube.Create(11); // 11 arbitrary
 //  n := High(UInt32);
 //  SetLength(Phase3CenterMove, 3, B_8_4, 3 * 18);
 //  //first coordinate direction 0,1,2 for UD RL FB
@@ -305,7 +305,7 @@ begin
   SetLength(Ph3Brick702CoordToSymCoord, 4900);
   SetLength(SymCoordRepToPh3Brick702Coord, 690);{ TODO : anpassen }
   // 690 equivalence classes
-  fc := faceletCube.Create(nil, 11); //11 more or less arbitrary
+  fc := faceletCube.Create(11); //11 more or less arbitrary
   Free := High(UInt16);
   for k := 0 to 4900 - 1 do
   begin
@@ -356,7 +356,7 @@ var
   i, j: integer;
 begin
   SetLength(Ph3RLFBCentCoordSymTransform, B_8_4 * B_8_4, 8);
-  fc := faceletCube.Create(nil, 11);
+  fc := faceletCube.Create(11);
   for i := 0 to B_8_4 * B_8_4 - 1 do
   begin
     fc.InvPh3RLFBCenterCoord(i, 2, 3);
@@ -439,29 +439,27 @@ begin
   total := UInt64(24010000) * N_SYMBRICK702COORD;//70^4*690
 
   SetLength(Ph3Brick702RLFBCentPrun, N_SYMBRICK702COORD);
-  Form1.Memo1.Lines.Add(Format('Initializing 3.9 GB of Memory...', []));
+  LogMsg(Format('Initializing 3.9 GB of Memory...', []));
   for i := 0 to N_SYMBRICK702COORD - 1 do
   begin
-    Application.ProcessMessages;
     SetLength(Ph3Brick702RLFBCentPrun[i], n_chunk);
   end;
 
   if FileExists(fName) then
   begin
-    Form1.Memo1.Lines.Add(Format('Loading pruning table %s', [fName]));
+    LogMsg(Format('Loading pruning table %s', [fName]));
     fs := TFileStream.Create(fName, fmOpenRead);
     for i := 0 to N_SYMBRICK702COORD - 1 do
     begin
-      Application.ProcessMessages;
       fs.ReadBuffer(Ph3Brick702RLFBCentPrun[i][0], n_chunk * SizeOf(UInt32));
     end;
     fs.Free;
-    Form1.Memo1.Lines.Add(Format('Done!', []));
+    LogMsg(Format('Done!', []));
   end
   else
   begin
-    Form1.Memo1.Lines.Add(Format('Generating pruning table %s', [fName]));
-    Form1.Memo1.Lines.Add(Format('This will take several hours.', []));
+    LogMsg(Format('Generating pruning table %s', [fName]));
+    LogMsg(Format('This will take several hours.', []));
     for i := 0 to N_SYMBRICK702COORD - 1 do
       for j := 0 to n_chunk - 1 do
         Ph3Brick702RLFBCentPrun[i, j] := $ffffffff;
@@ -478,13 +476,12 @@ begin
       depth3 := depth mod 3;
       if depth = 13 then  //xxx seem appropriate
       begin
-        Form1.Memo1.Lines.Add(
+        LogMsg(
           Format('Flipping to backward search at depth %d.', [depth]));
         backsearch := True;
       end;
       for bx_class := 0 to N_SYMBRICK702COORD - 1 do
       begin
-        Application.ProcessMessages;
 
         bycx := 0;
         while bycx < 24010000 do  //70^4
@@ -549,7 +546,7 @@ begin
                     begin
                       set_bycx_depth3(bx1_class, altbycx, (depth + 1) mod 3);
                       Inc(done);
-                      //Form1.Memo1.Lines.Add(Format('classidx: %d, by: %d, done: %d', [bx1_class,altby1,done]));
+                      //LogMsg(Format('classidx: %d, by: %d, done: %d', [bx1_class,altby1,done]));
                     end;
                   end;
                 end;
@@ -577,8 +574,7 @@ begin
           Inc(bycx);
         end;
       end;//bx_classidx
-      Form1.Memo1.Lines.Add(Format('depth: %d, done: %d', [depth, done]));
-      Application.ProcessMessages;
+      LogMsg(Format('depth: %d, done: %d', [depth, done]));
       Inc(depth);
       //1,9,96,784,5720,42484,327898,2426711,16325990,96663474,483027267,1920436040,11206360445
     end;
@@ -586,7 +582,7 @@ begin
     for i := 0 to N_SYMBRICK702COORD - 1 do
       fs.WriteBuffer(Ph3Brick702RLFBCentPrun[i][0], n_chunk * SizeOf(UInt32));
     fs.Free;
-    Form1.Memo1.Lines.Add(Format('Pruning table %s created.', [fName]));
+    LogMsg(Format('Pruning table %s created.', [fName]));
   end;
 end;
 

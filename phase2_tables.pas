@@ -38,7 +38,7 @@ var
   fc: faceletCube;
   mprev, mcurr: moves;
 begin
-  fc := faceletCube.Create(nil, 11); // any odd value possible
+  fc := faceletCube.Create(11); // any odd value possible
   for mcurr := InitMove to yB3 do
     // use NoMove for the predecessor if we have the first move
   begin
@@ -68,7 +68,7 @@ var
 const
   fName = 'FBCenterMove';
 begin
-  fc := faceletCube.Create(nil, 11); // 11 arbitrary
+  fc := faceletCube.Create(11); // 11 arbitrary
   SetLength(FBCenterMove, B_16_8, 3 * 18);
   // some moves are not allowed though
   if FileExists(fName) then
@@ -125,7 +125,7 @@ begin
   for slice := 0 to 15 do
     for k := 0 to 17 do
       FBfaceMoveAllowed[slice, k] := False; // default
-  fc := faceletCube.Create(nil, 11);
+  fc := faceletCube.Create(11);
   for slice := 0 to 15 do
   begin
     fc.InvPhase2SliceCoord(slice, 2, 3);
@@ -157,7 +157,7 @@ var
   mv: Moves;
 begin
   SetLength(FBPlusCrossPrun, B_16_8 * 2);
-  fc := faceletCube.Create(nil, 11);
+  fc := faceletCube.Create(11);
   for i := 0 to B_16_8 * 2 - 1 do
     FBPlusCrossPrun[i] := $FF;
   idx := fc.Phase2CenterCoord(2, fc.size div 2); // 2 is arbitrary
@@ -356,7 +356,7 @@ var
   a: Axis;
   fc: faceletcube;
 begin
-  fc := faceletCube.Create(nil, 11); // 11 arbitrary
+  fc := faceletCube.Create(11); // 11 arbitrary
   SetLength(FBSliceMove, 16, 3 * 18);
 
   for i := 0 to 15 do
@@ -393,7 +393,7 @@ var
   a: Axis;
   fc: faceletcube;
 begin
-  fc := faceletcube.Create(nil, 11);
+  fc := faceletcube.Create(11);
   SetLength(FBXCrossMove, B_16_8, 6 * 6);
   for i := 0 to B_16_8 - 1 do
   begin

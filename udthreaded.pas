@@ -1,123 +1,48 @@
 unit UDThreaded;
 
+// Parallel solver for the phase 1 "oblique" (x,y)/(y,x) center orbits.
+// This is a cross-platform port of the original Windows-only thread pool
+// (which used THandle/WaitForMultipleObjects): TThread.WaitFor is used
+// instead, which is implemented on every FPC target including macOS/Cocoa
+// via cthreads. The search algorithm itself (including the depth-10
+// meet-in-the-middle pruning table and the first-move axis partitioning
+// across worker threads) is unchanged from the original.
+
 {$mode objfpc}{$H+}
 
 interface
 
 uses Classes, cubedefs, facecube;
 
-type
+const
+  maxUDCenterThreads = 18; // Sollte ein Teiler von 54 sein
 
-  threadWrapper = class(TThread)
-  private
-    x, y, max: integer; // Koordinaten des Clusters
-    fc: faceletcube;
-  protected
-    procedure Execute; override;
-  public
-    constructor Create(i, j, maxDepth: integer; ffc: faceletcube);
-  end;
-
-  makeUDCenter = class(TThread)
-  private
-    // Achse auf der der 1. Zug stattfindet
-    ax: integer; // 1. Drehung hat index 3*ax bis 3*ax+2
-    x, y, max: integer; // Koordinaten des Clusters
-    fc: faceletcube;
-  protected
-    procedure Execute; override;
-    constructor Create(a: integer; i, j, maxDepth: integer; flc: faceletcube);
-    procedure SearchUDCenter(ccx, slx, ccy, sly, togo: integer);
-  end;
-
-  makeUDAll = class(TThread)
-  private
-    procedure showstuff;
-    procedure showstuff2;
-    procedure showstuff3;
-    procedure showstuff4;
-    procedure showstuff5;
-    procedure showstuff6;
-    procedure printApply;
-  var
-    ii, jj,ns: integer;
-    fcfc: faceletcube;
-    av: Double;
-  protected
-    procedure Execute; override;
-  public
-  end;
-
-  blueprint = class(TThread)
-  private
-    ax: Axis;
-    procedure showstuff;
-  protected
-    procedure Execute; override;
-    constructor Create(a: Axis); // Achse auf der der 1. Zug stattfindet
-  end;
+// Solves the (x,y) and (y,x) center orbits jointly, in parallel across
+// maxUDCenterThreads worker threads partitioned by first-move axis.
+// On success, leaves the solving move sequence in fc.fxymoves/fc.mvIdx,
+// exactly like the other single-threaded MakeXxx search functions on
+// faceletCube, and returns True.
+function MakeUDCenterParallel(fc: faceletCube; x, y, maxDepth: integer): boolean;
 
 implementation
 
-uses main, SysUtils, Windows, Forms, phase1_tables;
+uses SysUtils, globals, phase1_tables;
 
-const
-  maxThreads = 18; // Sollte ein Teiler von 54 sein
+type
+  makeUDCenter = class(TThread)
+  private
+    ax: integer; // 1. Drehung hat index 3*ax bis 3*ax+2
+    x, y, max: integer; // Koordinaten des Clusters
+    fc: faceletcube;
+    procedure SearchUDCenter(ccx, slx, ccy, sly, togo: integer);
+  protected
+    procedure Execute; override;
+  public
+    constructor Create(a: integer; i, j, maxDepth: integer; flc: faceletcube);
+  end;
 
 var
-  tud: array [0 .. maxThreads - 1] of makeUDCenter; // Globale Variable
-
-constructor threadWrapper.Create(i, j, maxDepth: integer; ffc: faceletcube);
-begin
-  inherited Create(False); // gleich starten
-  x := i;
-  y := j;
-  max := maxDepth;
-  fc := ffc;
-  // false: Ausführung beginnt sofort. true: starter erst mit resume
-end;
-
-procedure threadWrapper.Execute;
-var
-  aa: integer; // 1. Drehung hat index 3*aa bis 3*aa+2
-  handles: array [0 .. maxThreads - 1] of THandle;
-  k: integer;
-begin
-
-  for aa := 0 to maxThreads - 1 do
-  begin
-    tud[aa] := makeUDCenter.Create(aa, x, y, max, fc);
-    tud[aa].FreeOnTerminate := False;
-    tud[aa].Priority := tpLowest;
-    handles[aa] := tud[aa].Handle;
-  end;
-  for aa := 0 to maxThreads - 1 do
-
-  begin
-    tud[aa].Resume;
-  end;
-
-  WaitForMultipleObjects(maxThreads, @handles, True, INFINITE);
-  // true: wartet, bis alle terminiert sind
-
-  Form1.fcube.mvIdx := -1; // signalisiert keine Lösung
-  for aa := 0 to maxThreads - 1 do
-    if tud[aa].fc.found = True then
-    begin
-      Form1.fcube.mvIdx := tud[aa].fc.mvIdx; // dirty hack
-      for k := 0 to tud[aa].fc.mvIdx - 1 do
-        Form1.fcube.fxymoves[k] := tud[aa].fc.fxymoves[k];
-      break;
-    end;
-
-  // aufräumen
-  for aa := 0 to maxThreads - 1 do
-  begin
-    tud[aa].fc.Free;
-    tud[aa].Free;
-  end;
-
-end;
+  tud: array [0 .. maxUDCenterThreads - 1] of makeUDCenter; // Globale Variable
 
 constructor makeUDCenter.Create(a: integer; i, j, maxDepth: integer; flc: faceletcube);
 begin
@@ -143,7 +68,6 @@ begin
     if togo > max then
       Exit;
     fc.mvIdx := 0; // 1. free place in fxymoves
-    //Phase1Brick256Coord(x,y)/(y,x) should be 0, which means solved
     SearchUDCenter(fc.Phase1CenterCoord(x, y), fc.Phase1Brick256Coord(x, y),
       fc.Phase1CenterCoord(y, x), fc.Phase1Brick256Coord(y, x), togo);
     Inc(togo);
@@ -194,7 +118,6 @@ begin
       exit;
 
   end;
-  { TODO : Reihenfolge untersuchen }
   if ((UDCentBrick256Prun[B_24_8 * slx + ccx] > togo) or
     (UDCentBrick256Prun[B_24_8 * sly + ccy] > togo)) then
     Exit;
@@ -204,7 +127,7 @@ begin
   if togo = 0 then
   begin
     fc.found := True;
-    for aa := 0 to maxThreads - 1 do
+    for aa := 0 to maxUDCenterThreads - 1 do
       tud[aa].Terminate; // alle Threads beenden
   end
   else
@@ -214,7 +137,7 @@ begin
 
     if stopProgram = True then
     begin
-      for aa := 0 to maxThreads - 1 do
+      for aa := 0 to maxUDCenterThreads - 1 do
         tud[aa].Terminate; // alle Threads beenden
       Exit;
     end;
@@ -265,10 +188,6 @@ begin
             newsly := UDBrick256Move[sly, Ord(mv) - 18];
           end;
         end;
-        { TODO : check this }
-        // dies bringt 2-3s
-        //if (newccx = ccx) and (newslx = slx) and (newccy = ccy) then
-        //  continue;
 
         fc.fxymoves[fc.mvIdx] := mv;
         Inc(fc.mvIdx);
@@ -285,158 +204,45 @@ begin
 
 end;
 
-procedure makeUDAll.showstuff;
-begin
-  Form1.Memo1.Lines.Add('');
-  Form1.Memo1.Lines.Add('Phase 1 - U,D Centers to U or D Faces:');
-  Form1.Memo1.Lines.Add('');
-  Form1.Memo1.Lines.Add('+cross:');
-end;
-
-procedure makeUDAll.showstuff2;
-begin
-  Form1.Memo1.Lines.Add('');
-  Form1.Memo1.Lines.Add(Format('+cross phase 1: %d moves, %.2f moves/orbit on average.',[ns,av]));
-  Form1.Memo1.Lines.Add('');
-  Form1.Memo1.Lines.Add('(x,y) and (y,x) orbits:');
-end;
-
-procedure makeUDAll.showstuff3;
-begin
-  Form1.Memo1.Lines.Add('computation aborted...');
-  Form1.BPhase1.Caption := 'Solve Phase 1';
-end;
-
-procedure makeUDAll.showstuff4;
-begin
-  Form1.Memo1.Lines.Add('');
-  Form1.Memo1.Lines.Add(Format('oblique (x,y) and (y,x) orbits phase 1: %d moves, %.2f moves/orbit on average.',[ns,av]));
-  Form1.Memo1.Lines.Add('');
-  Form1.Memo1.Lines.Add('xcross:');
-end;
-
-procedure makeUDAll.showstuff5;
-begin
-  Form1.Memo1.Lines.Add('');
-  Form1.Memo1.Lines.Add(Format('x-cross phase1: %d moves, %.2f moves/orbit on average.',[ns,av]));
-  Form1.Memo1.Lines.Add('');
-  Form1.Memo1.Lines.Add('Total number of moves in phase 1: ' + IntToStr(ii));
-  Form1.Memo1.Lines.Add('');
-  Form1.BPhase1.Caption := 'Solve Phase 1';
-  Form1.BPhase2.Enabled := True; //We can do Phase 2 now
-end;
-
-procedure makeUDAll.showstuff6;
-begin
-  Form1.Memo1.Lines.Add('End Execution ' + IntToStr(Ord(ii)));
-end;
-
-
-procedure makeUDAll.printApply;
-begin
-  fcfc.printMoves(ii, jj);
-  fcfc.applyMoves(ii, jj);
-end;
-
-procedure makeUDAll.Execute;
+function MakeUDCenterParallel(fc: faceletCube; x, y, maxDepth: integer): boolean;
 var
-  i, j, totalLength: integer;
-  fc: faceletcube;
-  tt: threadWrapper;
+  aa, k: integer;
 begin
-  fc := Form1.fcube;
-  totalLength := 0;
-  synchronize(@showstuff);
-  //++++++++++++++++++++++ fix Plus-cross of phase1 ++++++++++++++++++++++++++++
-  ns:=0;
-  if Odd(fc.size) then
-    for i := 1 to fc.size div 2 - 1 do
-    begin
-      if Form1.fcube.MakeUDPlusCross1(i) then
-      begin
-        Inc(totalLength, fc.mvIdx);
-        Inc(ns, fc.mvIdx);
-        ii := i;
-        jj := fc.size div 2;
-        fcfc := fc;
-        synchronize(@printApply);
-      end;
-    end;
-    av:= ns/(fc.size div 2 - 1);
-  //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-  //++++++++++++++++++++++++++++ fix center orbits of phase 1 ++++++++++++++++++
-  synchronize(@showstuff2);
-  ns:=0;
-  for i := fc.size div 2 - 2 downto 1 do
-    for j := i + 1 to fc.size div 2 - 1 do
-    begin
-      if Terminated then
-        Exit;
-      if stopProgram then
-      begin
-        synchronize(@showstuff3);
-        Exit;
-      end;
-      tt := threadWrapper.Create(i, j, 25, fc);
-      tt.WaitFor; // important!
-      Inc(totalLength, fc.mvIdx);
-      Inc(ns, fc.mvIdx);
-      ii := i;
-      jj := j;
-      synchronize(@printApply);
-    end;
-    av:= ns/(fc.size div 2 - 1)/(fc.size div 2 - 2);
-  //++++++++++++++++++++++++++++ fix X-cross of phase 1 ++++++++++++++++++++++++
-  synchronize(@showstuff4);
-  ns:=0;
-  for i := 1 to fc.size div 2 - 1 do
-    if Form1.fcube.MakeUDXCross(i) then
-    begin
-      Inc(totalLength, fc.mvIdx);
-      Inc(ns, fc.mvIdx);
-      ii := i;
-      jj := i;
-      fcfc := fc;
-      synchronize(@printApply);
-    end;
-  Inc(grandTotal, totalLength);
-  ii := totalLength;
-   av:= ns/(fc.size div 2 - 1);
-  synchronize(@showstuff5);
-end;
-
-constructor blueprint.Create(a: Axis);
-begin
-  inherited Create(True); // nicht starten
-  ax := a;
-end;
-
-
-procedure blueprint.showstuff;
-begin
-  Form1.Memo1.Lines.Add('End Execution ' + IntToStr(Ord(ax)));
-end;
-
-
-procedure blueprint.Execute;
-// wichtig ist, terminated abzufragen und entsprechend zu reagieren
-var
-  i, j, sz: UInt64;
-begin
-  // inherited;
-  if ax = B then
-    sz := 1
-  else
-    sz := 50000000;
-
-  for i := 0 to sz do
+  for aa := 0 to maxUDCenterThreads - 1 do
   begin
-    j := Random(10);
-    if Terminated then
-      Exit;
+    tud[aa] := makeUDCenter.Create(aa, x, y, maxDepth, fc);
+    tud[aa].FreeOnTerminate := False;
   end;
-  synchronize(@showstuff);
+  for aa := 0 to maxUDCenterThreads - 1 do
+    tud[aa].Start;
+
+  // portable equivalent of WaitForMultipleObjects(..., True, INFINITE):
+  // wait until every worker has terminated
+  for aa := 0 to maxUDCenterThreads - 1 do
+    tud[aa].WaitFor;
+
+  fc.mvIdx := -1; // signalisiert keine Lösung
+  for aa := 0 to maxUDCenterThreads - 1 do
+    if tud[aa].fc.found = True then
+    begin
+      fc.mvIdx := tud[aa].fc.mvIdx;
+      for k := 0 to tud[aa].fc.mvIdx - 1 do
+        fc.fxymoves[k] := tud[aa].fc.fxymoves[k];
+      break;
+    end;
+
+  for aa := 0 to maxUDCenterThreads - 1 do
+  begin
+    tud[aa].fc.Free;
+    tud[aa].Free;
+  end;
+
+  if fc.mvIdx < 0 then
+    LogMsg(Format(
+      'WARNING: MakeUDCenterParallel(%d,%d) found no solution within depth %d',
+      [x, y, maxDepth]));
+
+  Result := fc.mvIdx >= 0;
 end;
 
 end.

@@ -5,7 +5,7 @@ unit facecube;
 interface
 
 uses
-  Classes, SysUtils, Graphics, cubedefs;
+  Classes, SysUtils, cubedefs;
 
 function Cnk(n, k: integer): integer;
 
@@ -13,9 +13,7 @@ type
   faceletCube = class
   private
   public
-    cv: TCanvas; // canvas auf der gezeichnet wird
     size: integer; // number of cubies on an edge
-    pix: integer; // number of pixels for 1/3 facelet
     // face 0..5,row index 0..size-1, column index 0..size-1
     faceCols: array of array of array of ColorIndex;
     //tmoves: array of UInt16;
@@ -45,10 +43,6 @@ type
     function setMiddleEdgeCubies: EdgeStatus;
     function cornerParityEven: boolean;
     function edgeParity(y: integer): integer;
-    procedure DrawCube(xOff, yOff: integer);
-    procedure drawPara1(x, y: integer);
-    procedure drawPara2(x, y: integer);
-    procedure drawSquare(x, y: integer);
 
     // phase 1
     function nextMovePh1(idx: integer; currMove: moves): moves;
@@ -145,8 +139,11 @@ type
     procedure setClusterColorIndex(x, y, i: integer; col: ColorIndex);
     procedure getEdgeCluster(y: integer);
 
-    constructor Create(cvas: TCanvas; sz: integer); overload;
-    // creates cube with odd size
+    // creates cube with odd size sz
+    constructor Create(sz: integer); overload;
+    // copy constructor; used to give each search worker thread its own
+    // private cube (search state like mvIdx/fxymoves/found lives on the
+    // instance, so concurrent searches cannot share one faceletCube)
     constructor Create(fc: faceletCube); overload;
 
   end;
@@ -157,11 +154,10 @@ type
 //1<=x<y<(size-1)/2
 //UDXCrossMoveX: array of array of UInt32;
 //UDXCrossMoveF: array of array of UInt32;
-procedure printcl;
 
 implementation
 
-uses Windows, main, Forms, phase1_tables, phase2_tables, phase3_tables,
+uses globals, Math, phase1_tables, phase2_tables, phase3_tables,
   phase4_tables, phase5_tables;
 // Wendet die Symmetrie mit dem Index 0..15 auf Cluster(x,y) an
 // idx = 8*LR2 + 4*F2 + U4
@@ -502,7 +498,6 @@ begin
     S_F4:
       ;
   end;
-  Form1.PaintBoxFaces.Invalidate;
 end;
 
 
@@ -694,123 +689,12 @@ begin
         move(F, size - 1 - slice);
 
   end;
-  Form1.PaintBoxFaces.Invalidate;
 end;
 
 
 function faceletCube.getSize: integer;
 begin
   Result := size;
-end;
-
-procedure faceletCube.drawSquare(x, y: integer);
-var
-  p: array [1 .. 4] of TPoint;
-begin
-  p[1].x := x;
-  p[1].y := y;
-  p[2].x := x + 3 * pix;
-  p[2].y := y;
-  p[3].x := p[2].x;
-  p[3].y := p[2].y + 3 * pix;
-  p[4].x := p[3].x - 3 * pix;
-  p[4].y := p[3].y;
-  SetBkMode(cv.Handle, OPAQUE);
-  // to set the hatched background
-  SetBkColor(cv.Handle, clBlack);
-  cv.Polygon(p);
-  SetBkMode(cv.Handle, TRANSPARENT);
-end;
-
-procedure faceletCube.drawPara1(x, y: integer);
-var
-  p: array [1 .. 4] of TPoint;
-begin
-  p[1].x := x;
-  p[1].y := y;
-  p[2].x := x + 3 * pix;
-  p[2].y := y;
-  p[3].x := p[2].x - 2 * pix;
-  p[3].y := p[2].y + 2 * pix;
-  p[4].x := p[3].x - 3 * pix;
-  p[4].y := p[3].y;
-  SetBkMode(cv.Handle, OPAQUE);
-  // to set the hatched background
-  SetBkColor(cv.Handle, clBlack);
-  cv.Polygon(p);
-  SetBkMode(cv.Handle, TRANSPARENT);
-end;
-
-procedure faceletCube.drawPara2(x, y: integer);
-var
-  p: array [1 .. 4] of TPoint;
-begin
-  p[1].x := x;
-  p[1].y := y;
-  p[2].x := x + 2 * pix;
-  p[2].y := y - 2 * pix;
-  p[3].x := p[2].x;
-  p[3].y := p[2].y + 3 * pix;
-  p[4].x := p[1].x;
-  p[4].y := p[1].y + 3 * pix;
-  SetBkMode(cv.Handle, OPAQUE);
-  // to set the hatched background
-  SetBkColor(cv.Handle, clBlack);
-  cv.Polygon(p);
-  SetBkMode(cv.Handle, TRANSPARENT);
-end;
-
-procedure faceletCube.DrawCube(xOff, yOff: integer);
-var
-  i, j: integer;
-begin
-  // left face
-  for i := 0 to size - 1 do
-    for j := 0 to size - 1 do
-    begin
-      cv.Brush.Color := Color[faceCols[Ord(L), i, j]];
-      drawSquare(xOff + 3 * j * pix, yOff + 2 * pix * size + 3 * i * pix);
-    end;
-  // front face
-  for i := 0 to size - 1 do
-    for j := 0 to size - 1 do
-    begin
-      cv.Brush.Color := Color[faceCols[Ord(F), i, j]];
-      drawSquare(xOff + 3 * pix * size + 3 * j * pix, yOff + 2 * pix *
-        size + 3 * i * pix);
-    end;
-  // down face
-  for i := 0 to size - 1 do
-    for j := 0 to size - 1 do
-    begin
-      cv.Brush.Color := Color[faceCols[Ord(D), i, j]];
-      drawSquare(xOff + 3 * pix * size + 3 * j * pix, yOff + 5 * pix *
-        size + 3 * i * pix);
-    end;
-  // back face
-  for i := 0 to size - 1 do
-    for j := 0 to size - 1 do
-    begin
-      cv.Brush.Color := Color[faceCols[Ord(B), i, j]];
-      drawSquare(xOff + 8 * pix * size + 3 * j * pix, yOff + 3 * i * pix);
-    end;
-
-  // right face
-  for i := 0 to size - 1 do
-    for j := 0 to size - 1 do
-    begin
-      cv.Brush.Color := Color[faceCols[Ord(R), i, j]];
-      drawPara2(xOff + 6 * pix * size + 2 * j * pix, yOff + 2 * pix *
-        size + 3 * i * pix - 2 * j * pix);
-    end;
-  // up face
-  for i := 0 to size - 1 do
-    for j := 0 to size - 1 do
-    begin
-      cv.Brush.Color := Color[faceCols[Ord(U), i, j]];
-      drawPara1(xOff + 5 * pix * size - 2 * pix * i + 3 * pix * j,
-        yOff + 2 * i * pix);
-    end;
 end;
 
 function faceletCube.cornerParityEven: boolean;
@@ -975,13 +859,12 @@ begin
 end;
 
 
-constructor faceletCube.Create(cvas: TCanvas; sz: integer);
+constructor faceletCube.Create(sz: integer);
 var
   i, j: integer;
   a: Axis;
   c: ColorIndex;
 begin
-  cv := cvas;
   size := sz;
   SetLength(faceCols, 6, size, size);
   for a := U to B do
@@ -1001,7 +884,6 @@ var
   a: Axis;
   c: ColorIndex;
 begin
-  cv := fc.cv; // Kann Probleme bereiten!
   if Odd(fc.size) then
   begin
     size := fc.size;
@@ -1052,7 +934,6 @@ begin
     end;
   end;
 end;
-
 
 //phase 1 implementation
 
@@ -1463,7 +1344,8 @@ begin
   mm := mm + ' (' + IntToStr(mvIdx) + ')';
   if (i > 0) and (j > 0) then
     mm := '(' + IntToStr(i) + ',' + IntToStr(j) + '):' + mm;
-  Form1.Memo1.Lines.Add(mm);
+  if verbose then
+    LogMsg(mm);
 end;
 
 procedure faceletCube.applyMoves(i, j: integer);
@@ -1488,20 +1370,6 @@ begin
       move(a, slc);
   end;
 end;
-
-
-procedure printcl;
-var
-  s: string;
-  i: integer;
-begin
-  s := '';
-  for i := 0 to 23 do
-    s := s + Format('%3d', [form1.fcube.ecls[edgemx, i]]);
-  Form1.Memo1.Lines.Add('debug ' + s);
-end;
-
-
 
 
 procedure faceletCube.applyEdgeMoves(x: integer);
@@ -1990,7 +1858,6 @@ var
 
 begin
 
-  Application.ProcessMessages;
 
   if (FBFullCenterSlicePrun[UInt64(B_16_8) * (UInt64(B_16_8) * slx + ccx) +
     ccy] > togo) then
@@ -2080,7 +1947,6 @@ var
   mv: moves;
 begin
 
-  Application.ProcessMessages;
   if FBXCrossPrun[B_16_8 * sly + ccx] > togo then
     Exit;
   if togo = 0 then
@@ -2505,7 +2371,6 @@ var
   cx1, cy1, cxt, cyt, dx1, dy1, i, bycx_distmod3, bxcy_distmod3: integer;
 
 begin
-  Application.ProcessMessages;
   //Form1.Memo1.Lines.Add(Format('bx: %d, togo: %d, mvidx: %d', [bx, togo, mvidx]));
   //printmoves(1,2);
   if stopProgram then
@@ -2951,7 +2816,6 @@ var
   cx1, cy1, bxy1, bo1: integer;
 
 begin
-  Application.ProcessMessages;
   if Ph4UDCentBrickPrun[B_8_4 * (B_8_4 * bxy + cx) + cy] > togo then
     Exit;
   if (togo = 0) and (bo = 0) then { TODO : Bedingung relaxen, nur für 3. Seite nötig }
@@ -3039,7 +2903,6 @@ var
   cx1, b1, bo1: UInt16;
 
 begin
-  Application.ProcessMessages;
 
   if Ph4UDXCrossPrun[B_8_4 * (B_8_4 * bo + b) + cx] > togo then
     Exit;
@@ -3833,7 +3696,6 @@ begin
             printMoves(i, -1);
             improved := True;
             togo := 1;
-            Application.ProcessMessages;
           end;
 
         end;

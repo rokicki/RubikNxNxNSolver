@@ -5,7 +5,7 @@ unit cubedefs;
 interface
 
 uses
-  Classes, SysUtils, Graphics;
+  Classes, SysUtils;
 
 const
   UDOPTIMAL = True; // langsamere aber optimale Version wenn true
@@ -60,9 +60,6 @@ type
   CFPosition = array [URF .. DRB, 0 .. 2] of integer;
   EFPosition = array [UR .. BR, 0 .. 1] of integer;
   ECFPosition = array [0 .. 23, 0 .. 1] of integer;
-
-var
-  Color: array [UCol .. NoCol] of TColor; // Global colors of Cube
 
 const
   UDCenterID = 0; // Koordinate des Zielzustandes der UD-Center in Phase1

@@ -30,14 +30,14 @@ var
 
 implementation
 
-uses facecube, main, Forms;
+uses facecube;
 
 procedure createNextMovePhase4Table;
 var
   fc: faceletCube;
   mprev, mcurr: moves;
 begin
-  fc := faceletCube.Create(nil, 11); // any odd value possible
+  fc := faceletCube.Create(11); // any odd value possible
   for mcurr := InitMove to yB3 do
     // use NoMove for the predecessor if we have the first move
   begin
@@ -65,7 +65,7 @@ var
   n: UInt32;
   fc: faceletcube;
 begin
-  fc := faceletCube.Create(nil, 11); // 11 arbitrary
+  fc := faceletCube.Create(11); // 11 arbitrary
   SetLength(Phase4CenterMove, B_8_4, 3 * 18);
   n := High(UInt32);
 
@@ -129,7 +129,7 @@ var
   n: UInt16;
   fc: faceletcube;
 begin
-  fc := faceletCube.Create(nil, 11); // 11 arbitrary
+  fc := faceletCube.Create(11); // 11 arbitrary
   SetLength(Phase4RLFBBrickMove, 256, 3 * 18);
 
   n := High(UInt16);
@@ -180,7 +180,7 @@ var
   n: UInt16;
   fc: faceletcube;
 begin
-  fc := faceletCube.Create(nil, 11); // 11 arbitrary
+  fc := faceletCube.Create(11); // 11 arbitrary
   SetLength(Phase4UDBrickMove, 4900, 3 * 18);
 
   n := High(UInt16);
@@ -442,7 +442,7 @@ var
   n: UInt16;
   fc: faceletcube;
 begin
-  fc := faceletCube.Create(nil, 11); // 11 arbitrary
+  fc := faceletCube.Create(11); // 11 arbitrary
   SetLength(Phase4UDXCrossMove, B_8_4, 3 * 12);
 
   n := High(UInt16);

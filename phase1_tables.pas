@@ -57,7 +57,7 @@ var
 
 implementation
 
-uses facecube, main, Forms;
+uses facecube, globals;
 
 procedure createNextMovePhase1Table;
 var
@@ -65,7 +65,7 @@ var
   mprev, mcurr: moves;
 
 begin
-  fc := faceletCube.Create(nil, 11); // any odd value possible
+  fc := faceletCube.Create(11); // any odd value possible
   for mcurr := InitMove to yB3 do
     // use NoMove for the predecessor if we have the first move
     nextMovePhase1[NoMove, mcurr] := fc.nextMovePh1(0, mcurr);
@@ -89,7 +89,7 @@ begin
   SetLength(UDCentCoordToSymCoord, B_24_8);
   SetLength(SymCoordRepToUDCenterCoord, N_SYMCENTCOORD);
   // 92247 equivalence classes
-  fc := faceletCube.Create(nil, 11); //11 more or less arbitrary
+  fc := faceletCube.Create(11); //11 more or less arbitrary
   Free := High(UInt32);
   for k := 0 to B_24_8 - 1 do
   begin
@@ -149,7 +149,7 @@ begin
   end
   else
   begin
-    fc := faceletCube.Create(nil, 11);
+    fc := faceletCube.Create(11);
     for i := 0 to B_24_8 - 1 do
     begin
       fc.InvPhase1CenterCoord(i, 2, 3);
@@ -174,7 +174,7 @@ var
   i: integer;
 begin
   SetLength(UDBrick256CoordSymTransform, 256, 8);
-  fc := faceletCube.Create(nil, 11); // Beim ID-Cube stimmt das UDPlusCross
+  fc := faceletCube.Create(11); // Beim ID-Cube stimmt das UDPlusCross
   for i := 0 to 256 - 1 do
   begin
     fc.InvPhase1Brick256Coord(i, 2, 3);
@@ -221,7 +221,7 @@ var
   fc: faceletCube;
 begin
   SetLength(UDfaceMoveAllowed, 256, 18);
-  fc := faceletCube.Create(nil, 11);
+  fc := faceletCube.Create(11);
   for brick := 0 to 255 do
   begin
     fc.InvPhase1Brick256Coord(brick, 2, 3);
@@ -254,7 +254,7 @@ var
   m: Moves;
 begin
   SetLength(UDPlusCross1Prun, B_24_8);
-  fc := faceletCube.Create(nil, 11);
+  fc := faceletCube.Create(11);
   for i := 0 to B_24_8 - 1 do
     UDPlusCross1Prun[i] := $FF;
   idx := fc.Phase1CenterCoord(2, fc.size div 2); // Egal ob 2
@@ -291,7 +291,7 @@ var
 const
   fName = 'UDCenterMove';
 begin
-  fc := faceletCube.Create(nil, 11); // 11 arbitrary
+  fc := faceletCube.Create(11); // 11 arbitrary
   SetLength(UDCenterMove, B_24_8, 3 * 18);
 
   if FileExists(fName) then
@@ -344,7 +344,7 @@ var
   a: Axis;
   fc: faceletcube;
 begin
-  fc := faceletCube.Create(nil, 11); // 11 arbitrary
+  fc := faceletCube.Create(11); // 11 arbitrary
   SetLength(UDBrick256Move, 256, 3 * 18);
   for i := 0 to 256 - 1 do
   begin
@@ -526,13 +526,12 @@ begin
   SetLength(UDStates10Table, N_SYMCENTCOORD * 256);
   if FileExists(fName) then
   begin
-    Form1.Memo1.Lines.Add('Loading ' + fName);
+    LogMsg('Loading ' + fName);
     fs := TFileStream.Create(fName, fmOpenRead);
     for i := 0 to N_SYMCENTCOORD * 256 - 1 do
     begin
       if i mod 180000 = 0 then
-        Form1.memo1.Lines.Text := Form1.memo1.Lines.Text + '.';
-      Application.ProcessMessages;
+        LogProgress('.');
       fs.ReadBuffer(used, SizeOf(used));
       UDStates10Table[i].used := used;
       SetLength(UDStates10Table[i].state, used);
@@ -540,12 +539,12 @@ begin
         fs.ReadBuffer(UDStates10Table[i].state[0], used * 4);
     end;
     fs.Free;
-    Form1.Memo1.Lines.Add('Finished loading ' + fName);
+    LogMsg('Finished loading ' + fName);
   end
   else
   begin
-    Form1.Memo1.Lines.Add('Creating ' + fName);
-    Form1.Memo1.Lines.Add('This will take several hours.');
+    LogMsg('Creating ' + fName);
+    LogMsg('This will take several hours.');
 
     // für alle reduzierten (ccx,slice)
     SetLength(savearr, N_SYMCENTCOORD * 256); // Kopie
@@ -571,7 +570,6 @@ begin
       end;
       for i := 0 to N_SYMCENTCOORD * 256 - 1 do
       begin
-        Application.ProcessMessages;
         used := savearr[i].used;
         slice := i mod 256;
         ccx := SymCoordRepToUDCenterCoord[i div 256];
@@ -623,10 +621,10 @@ begin
           end;//mv
         end;//j
       end; //i
-      Form1.Memo1.Lines.Add(IntToStr(testCount[0]));
+      LogMsg(IntToStr(testCount[0]));
     end;//k
 
-    Form1.Memo1.Lines.Add('Writing ' + fName);
+    LogMsg('Writing ' + fName);
     fs := TFileStream.Create(fName, fmCreate);
     for i := 0 to N_SYMCENTCOORD * 256 - 1 do
     begin
@@ -638,7 +636,7 @@ begin
         fs.WriteBuffer(UDStates10Table[i].state[0], used * 4);
     end;
     fs.Free;
-    Form1.Memo1.Lines.Add('Finished writing ' + fName);
+    LogMsg('Finished writing ' + fName);
   end;
   SetLength(savearr, 0);
 end;
@@ -662,7 +660,7 @@ begin
   end
   else
   begin
-    fc := faceletCube.Create(nil, 11);
+    fc := faceletCube.Create(11);
     for i := 0 to B_24_8 - 1 do
     begin
       fc.InvPhase1CenterCoord(i, 2, 2);//2 is arbitrary
